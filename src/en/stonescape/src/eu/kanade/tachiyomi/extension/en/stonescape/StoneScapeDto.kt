@@ -76,14 +76,14 @@ data class PageDto(
     val url: String,
 )
 
+private val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).apply {
+    timeZone = TimeZone.getTimeZone("UTC")
+}
+
 private fun parseDate(dateStr: String?): Long {
     if (dateStr == null) return 0L
     return try {
-        // Strip fractional seconds to prevent precision mismatch crashing the SimpleDateFormat
         val cleanDate = dateStr.replace(" ", "T").substringBefore(".").substringBefore("+")
-        val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).apply {
-            timeZone = TimeZone.getTimeZone("UTC")
-        }
         dateFormat.parse(cleanDate)?.time ?: 0L
     } catch (_: Exception) {
         0L
