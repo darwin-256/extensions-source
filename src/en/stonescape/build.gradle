@@ -1,7 +1,7 @@
 ext {
     extName = 'StoneScape'
     extClass = '.StoneScape'
-    extVersionCode = 3
+    extVersionCode = 48
     isNsfw = false
 }
 apply from: "$rootDir/common.gradle"
