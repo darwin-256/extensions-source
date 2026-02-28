@@ -113,9 +113,9 @@ class StoneScape : HttpSource() {
     }
 
     override fun chapterListParse(response: Response): List<SChapter> {
-    val result = response.parseAs<ChapterListResponse>()
-    val seriesSlug = response.request.url.pathSegments.let { it[it.size - 2] }
-    return result.chapters.map { it.toSChapter(seriesSlug) }.reversed()
+        val result = response.parseAs<ChapterListResponse>()
+        val seriesSlug = response.request.url.pathSegments.let { it[it.size - 2] }
+        return result.chapters.map { it.toSChapter(seriesSlug) }.reversed()
     }
 
     override fun getChapterUrl(chapter: SChapter): String = "$baseUrl${chapter.url.substringBefore("#")}"
