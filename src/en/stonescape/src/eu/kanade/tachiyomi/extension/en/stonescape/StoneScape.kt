@@ -103,7 +103,6 @@ class StoneScape : HttpSource() {
     }
 
     override fun mangaDetailsParse(response: Response): SManga = response.parseAs<SeriesDto>().toSMangaDetails(baseUrl)
-    }
 
     override fun getMangaUrl(manga: SManga): String = "$baseUrl${manga.url}"
 
