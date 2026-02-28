@@ -9,50 +9,64 @@ import java.util.Locale
 import java.util.TimeZone
 
 @Serializable
-data class SeriesResponse(
+class SeriesResponse(
     val data: List<SeriesDto>,
     val pagination: PaginationDto? = null,
 )
 
 @Serializable
-data class PaginationDto(
-    val page: Int? = null,
-    val totalPages: Int? = null,
+class PaginationDto(
+    private val page: Int? = null,
+    private val totalPages: Int? = null,
 ) {
     val current: Int get() = page ?: 1
     val total: Int get() = totalPages ?: 1
 }
 
 @Serializable
-data class SeriesDto(
-    val seriesId: String,
-    val title: String,
-    val slug: String,
-    val coverUrl: String? = null,
-    val description: String? = null,
-    @SerialName("publicationStatus") val status: String? = null,
-    val author: String? = null,
-    val artist: String? = null,
-    val genres: List<String>? = null,
+class SeriesDto(
+    private val title: String,
+    private val slug: String,
+    private val coverUrl: String? = null,
+    private val description: String? = null,
+    @SerialName("publicationStatus") private val status: String? = null,
+    private val author: String? = null,
+    private val artist: String? = null,
+    private val genres: List<String>? = null,
 ) {
     fun toSManga(baseUrl: String) = SManga.create().apply {
         url = "/series/$slug"
         title = this@SeriesDto.title
-        thumbnail_url = this@SeriesDto.coverUrl?.let { baseUrl + it }
+        thumbnail_url = coverUrl?.let { baseUrl + it }
+    }
+
+    fun toSMangaDetails(baseUrl: String) = toSManga(baseUrl).apply {
+        description = this@SeriesDto.description
+        status = when (this@SeriesDto.status?.lowercase()) {
+            "ongoing" -> SManga.ONGOING
+            "completed" -> SManga.COMPLETED
+            "hiatus" -> SManga.ON_HIATUS
+            "dropped", "cancelled" -> SManga.CANCELLED
+            else -> SManga.UNKNOWN
+        }
+        author = this@SeriesDto.author
+        artist = this@SeriesDto.artist
+        genre = genres?.joinToString(", ") { it.replaceFirstChar { char -> char.uppercase() } }
+        initialized = true
     }
 }
 
 @Serializable
-data class ChapterListResponse(
+class ChapterListResponse(
     val chapters: List<ChapterDto>,
 )
 
 @Serializable
-data class ChapterDto(
-    val chapterId: String,
-    val chapterNumber: String,
-    val title: String? = null,
-    val createdAt: String? = null,
+class ChapterDto(
+    private val chapterId: String,
+    private val chapterNumber: String,
+    private val title: String? = null,
+    private val createdAt: String? = null,
 ) {
     fun toSChapter(seriesSlug: String) = SChapter.create().apply {
         val formattedNumber = chapterNumber.removeSuffix(".00")
@@ -64,15 +78,15 @@ data class ChapterDto(
 }
 
 @Serializable
-data class ChapterDetailsDto(
-    val pages: List<PageDto> = emptyList(),
-    val images: List<PageDto> = emptyList(),
+class ChapterDetailsDto(
+    private val pages: List<PageDto> = emptyList(),
+    private val images: List<PageDto> = emptyList(),
 ) {
     val allPages: List<PageDto> get() = pages.ifEmpty { images }
 }
 
 @Serializable
-data class PageDto(
+class PageDto(
     val url: String,
 )
 
