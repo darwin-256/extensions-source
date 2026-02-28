@@ -31,11 +31,6 @@ class StatusFilter :
 class Genre(name: String, val slug: String) : Filter.CheckBox(name)
 class GenreFilter(genres: List<Genre>) : Filter.Group<Genre>("Genres", genres)
 
-fun getFilters() = FilterList(
-    ContentTypeFilter(),
-    StatusFilter(),
-    GenreFilter(getGenreList()),
-)
 
 fun getGenreList() = listOf(
     Genre("Action", "action"),
