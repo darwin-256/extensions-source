@@ -18,6 +18,7 @@ class StoneScape : HttpSource() {
     override val baseUrl = "https://stonescape.xyz"
     override val lang = "en"
     override val supportsLatest = true
+    override val versionId = 2
 
     private val apiUrl = "$baseUrl/api"
 
