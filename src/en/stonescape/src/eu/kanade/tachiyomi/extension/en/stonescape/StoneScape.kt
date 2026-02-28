@@ -102,8 +102,7 @@ class StoneScape : HttpSource() {
         return GET("$apiUrl/series/by-slug/$slug", headers)
     }
 
-    override fun mangaDetailsParse(response: Response): SManga {
-        return response.parseAs<SeriesDto>().toSMangaDetails(baseUrl)
+    override fun mangaDetailsParse(response: Response): SManga = response.parseAs<SeriesDto>().toSMangaDetails(baseUrl)
     }
 
     override fun getMangaUrl(manga: SManga): String = "$baseUrl${manga.url}"
