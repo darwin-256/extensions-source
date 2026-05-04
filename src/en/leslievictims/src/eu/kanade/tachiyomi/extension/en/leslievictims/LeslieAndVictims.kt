@@ -27,134 +27,117 @@ class LeslieAndVictims : HttpSource() {
     override fun headersBuilder() = super.headersBuilder()
         .add("Referer", "$baseUrl/")
 
+    // ============================== Popular ===============================
+
     override fun popularMangaRequest(page: Int): Request = GET("$baseUrl/api/library", headers)
 
     override fun popularMangaParse(response: Response): MangasPage {
-        val entries = response.parseAs<List<LibraryEntry>>()
-        val mangas = entries.map { it.toSManga(baseUrl) }
+        val mangas = response.parseAs<List<LibraryEntry>>().map { it.toSManga(baseUrl) }
         return MangasPage(mangas, false)
     }
+
+    // =============================== Latest ===============================
 
     override fun latestUpdatesRequest(page: Int): Request = throw UnsupportedOperationException()
 
     override fun latestUpdatesParse(response: Response): MangasPage = throw UnsupportedOperationException()
 
-    override fun searchMangaRequest(page: Int, query: String, filters: FilterList): Request {
-        // Appending query as fragment to avoid intercepting and mutating the standard Request logic
-        return GET("$baseUrl/api/library#$query", headers)
-    }
+    // =============================== Search ===============================
+
+    override fun searchMangaRequest(page: Int, query: String, filters: FilterList): Request = GET("$baseUrl/api/library#$query", headers)
 
     override fun searchMangaParse(response: Response): MangasPage {
         val query = response.request.url.fragment ?: ""
-        val entries = response.parseAs<List<LibraryEntry>>()
-
-        val filtered = entries.filter { it.title.contains(query, ignoreCase = true) }
-        val mangas = filtered.map { it.toSManga(baseUrl) }
-
+        val mangas = response.parseAs<List<LibraryEntry>>()
+            .filter { it.title.contains(query, ignoreCase = true) }
+            .map { it.toSManga(baseUrl) }
         return MangasPage(mangas, false)
     }
 
-    override fun mangaDetailsRequest(manga: SManga): Request {
-        val seriesId = (baseUrl + manga.url).toHttpUrl().queryParameter("series")
-            ?: throw Exception("Invalid manga URL")
-        return GET("$baseUrl/api/library#$seriesId", headers)
-    }
+    // ============================== Details ===============================
 
-    override fun mangaDetailsParse(response: Response): SManga {
-        val seriesId = response.request.url.fragment!!
-        val entries = response.parseAs<List<LibraryEntry>>()
+    override fun mangaDetailsRequest(manga: SManga): Request = libraryRequestForManga(manga)
 
-        val entry = entries.find { it.getId() == seriesId }
-            ?: throw Exception("Series not found")
+    override fun mangaDetailsParse(response: Response): SManga = findEntry(response).toSManga(baseUrl)
 
-        return entry.toSManga(baseUrl)
-    }
+    override fun getMangaUrl(manga: SManga): String = baseUrl + manga.url
 
-    override fun chapterListRequest(manga: SManga): Request {
-        val seriesId = (baseUrl + manga.url).toHttpUrl().queryParameter("series")
-            ?: throw Exception("Invalid manga URL")
-        return GET("$baseUrl/api/library#$seriesId", headers)
-    }
+    // ============================== Chapters ==============================
 
-    override fun chapterListParse(response: Response): List<SChapter> {
-        val seriesId = response.request.url.fragment!!
-        val entries = response.parseAs<List<LibraryEntry>>()
+    override fun chapterListRequest(manga: SManga): Request = libraryRequestForManga(manga)
 
-        val entry = entries.find { it.getId() == seriesId }
-            ?: throw Exception("Series not found")
+    override fun chapterListParse(response: Response): List<SChapter> = findEntry(response).getChapters(baseUrl)
 
-        return entry.getChapters(baseUrl)
-    }
+    override fun getChapterUrl(chapter: SChapter): String = baseUrl + chapter.url
+
+    // =============================== Pages ================================
 
     override fun pageListRequest(chapter: SChapter): Request {
         val url = (baseUrl + chapter.url).toHttpUrl()
-        val seriesId = url.queryParameter("series")!!
-        val chId = url.queryParameter("ch")!!
+        val seriesId = url.queryParameter("series")
+            ?: throw Exception("Missing series ID in chapter URL")
+        val chId = url.queryParameter("ch")
+            ?: throw Exception("Missing chapter ID in chapter URL")
         return GET("$baseUrl/api/library#$seriesId|$chId", headers)
     }
 
     override fun pageListParse(response: Response): List<Page> {
-        val fragment = response.request.url.fragment!!
+        val fragment = response.request.url.fragment
+            ?: throw Exception("Missing fragment in page list request")
         val (seriesId, chId) = fragment.split("|")
 
-        val entries = response.parseAs<List<LibraryEntry>>()
-        val entry = entries.find { it.getId() == seriesId }
-            ?: throw Exception("Series not found")
+        val entry = response.parseAs<List<LibraryEntry>>()
+            .find { it.getId() == seriesId }
+            ?: throw Exception("Series not found: $seriesId")
 
         val chapterRoot = entry.getChapterRoot(chId)
-        val pages = mutableListOf<Page>()
 
         if (chapterRoot != null) {
             val rootUrl = chapterRoot.url
-
-            when (chapterRoot.mode) {
-                "list" -> {
-                    val list = chapterRoot.data.jsonArray.map { it.jsonPrimitive.content }
-                    list.forEachIndexed { i, file ->
-                        pages.add(Page(i, imageUrl = "$rootUrl/$file"))
-                    }
-                }
+            return when (chapterRoot.mode) {
+                "list" ->
+                    chapterRoot.data.jsonArray
+                        .map { it.jsonPrimitive.content }
+                        .mapIndexed { i, file -> Page(i, imageUrl = "$rootUrl/$file") }
                 "count" -> {
                     val count = chapterRoot.data.jsonPrimitive.content.toInt()
-                    for (i in 1..count) {
-                        val paddedNum = i.toString().padStart(2, '0')
-                        pages.add(Page(i - 1, imageUrl = "$rootUrl/$paddedNum.webp"))
+                    (1..count).map { i ->
+                        Page(i - 1, imageUrl = "$rootUrl/${i.toString().padStart(2, '0')}.webp")
                     }
                 }
+                else -> emptyList()
             }
-        } else {
-            // Brute force logic: probe sequentially until receiving an HTML fallback instead of an image
-            val baseImgUrl = baseUrl.toHttpUrl().newBuilder()
-                .addPathSegment("content")
-                .addPathSegment(seriesId)
-                .addPathSegment(chId)
+        }
+
+        val baseImgUrl = baseUrl.toHttpUrl().newBuilder()
+            .addPathSegment("content")
+            .addPathSegment(seriesId)
+            .addPathSegment(chId)
+            .build()
+
+        val pages = mutableListOf<Page>()
+        var pageNum = 1
+        while (pageNum <= 150) {
+            val imgUrl = baseImgUrl.newBuilder()
+                .addPathSegment("${pageNum.toString().padStart(2, '0')}.webp")
+                .build()
+                .toString()
+
+            val checkReq = Request.Builder()
+                .url(imgUrl)
+                .head()
+                .headers(headers)
                 .build()
 
-            var pageNum = 1
-            while (pageNum <= 150) { // Safety limit against infinite loops
-                val paddedNum = pageNum.toString().padStart(2, '0')
-                val imgUrl = baseImgUrl.newBuilder()
-                    .addPathSegment("$paddedNum.webp")
-                    .build()
-                    .toString()
+            val (isSuccess, contentType) = client.newCall(checkReq).execute().use { res ->
+                res.isSuccessful to (res.header("Content-Type") ?: "")
+            }
 
-                val checkReq = Request.Builder()
-                    .url(imgUrl)
-                    .head()
-                    .headers(headers)
-                    .build()
-
-                val checkRes = client.newCall(checkReq).execute()
-                val contentType = checkRes.header("Content-Type") ?: ""
-                checkRes.close()
-
-                if (checkRes.isSuccessful && contentType.startsWith("image")) {
-                    pages.add(Page(pageNum - 1, imageUrl = imgUrl))
-                    pageNum++
-                } else {
-                    // Reached the SPA text/html fallback page (or a legitimate 404 block)
-                    break
-                }
+            if (isSuccess && contentType.startsWith("image")) {
+                pages.add(Page(pageNum - 1, imageUrl = imgUrl))
+                pageNum++
+            } else {
+                break
             }
         }
 
@@ -163,7 +146,19 @@ class LeslieAndVictims : HttpSource() {
 
     override fun imageUrlParse(response: Response): String = throw UnsupportedOperationException()
 
-    override fun getMangaUrl(manga: SManga): String = baseUrl + manga.url
+    // ============================== Utilities =============================
 
-    override fun getChapterUrl(chapter: SChapter): String = baseUrl + chapter.url
+    private fun libraryRequestForManga(manga: SManga): Request {
+        val seriesId = (baseUrl + manga.url).toHttpUrl().queryParameter("series")
+            ?: throw Exception("Invalid manga URL")
+        return GET("$baseUrl/api/library#$seriesId", headers)
+    }
+
+    private fun findEntry(response: Response): LibraryEntry {
+        val seriesId = response.request.url.fragment
+            ?: throw Exception("Missing series ID in request fragment")
+        return response.parseAs<List<LibraryEntry>>()
+            .find { it.getId() == seriesId }
+            ?: throw Exception("Series not found: $seriesId")
+    }
 }
