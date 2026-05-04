@@ -33,7 +33,6 @@ class LibraryEntry(
 
             url = urlBuilder.build().run { "$encodedPath?$encodedQuery" }
             name = "Chapter $chId"
-            // Safely parse decimals and text attached (e.g. "56.5 Special Smut Episode")
             chapter_number = chId.substringBefore(" ").toFloatOrNull() ?: -1f
         }
     }
