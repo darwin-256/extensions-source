@@ -69,8 +69,6 @@ class YaoiToon : HttpSource() {
 
         filters.forEach { filter ->
             when (filter) {
-                is TypeFilter -> url.addQueryParameter("type", filter.selectedValue())
-                is StatusFilter -> url.addQueryParameter("status", filter.selectedValue())
                 is SortFilter -> url.addQueryParameter("sort", filter.selectedValue())
                 is GenreList -> {
                     val selected = filter.state.filter { it.state }
