@@ -10,30 +10,6 @@ open class UriPartFilter(
     fun selectedValue() = vals[state].second
 }
 
-class TypeFilter :
-    UriPartFilter(
-        "Type",
-        arrayOf(
-            Pair("All", ""),
-            Pair("Manga", "manga"),
-            Pair("Manhua", "manhua"),
-            Pair("Manhwa", "manhwa"),
-            Pair("VNComic", "vncomic"),
-        ),
-    )
-
-class StatusFilter :
-    UriPartFilter(
-        "Status",
-        arrayOf(
-            Pair("All", ""),
-            Pair("Completed", "completed"),
-            Pair("OnGoing", "on-going"),
-            Pair("On-Hold", "on-hold"),
-            Pair("Canceled", "canceled"),
-        ),
-    )
-
 class SortFilter :
     UriPartFilter(
         "Sort",
@@ -54,8 +30,6 @@ class Genre(name: String, val id: String) : Filter.CheckBox(name)
 class GenreList(genres: List<Genre>) : Filter.Group<Genre>("Genres", genres)
 
 fun getFilters() = FilterList(
-    TypeFilter(),
-    StatusFilter(),
     SortFilter(),
     Filter.Separator(),
     GenreList(getGenreList()),
